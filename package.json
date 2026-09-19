@@ -65,5 +65,9 @@
   },
   "overrides": {
     "dompurify": "^3.4.13"
+  },
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "unrs-resolver@1.12.2": true
   }
 }
