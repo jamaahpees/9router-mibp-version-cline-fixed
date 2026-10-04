@@ -303,7 +303,20 @@ export async function proxyAwareFetch(url, options = {}, proxyOptions = null) {
       "x-relay-target": `${parsed.protocol}//${parsed.host}`,
       "x-relay-path": `${parsed.pathname}${parsed.search}`,
     };
-    return originalFetch(vercelRelayUrl, { ...options, headers: relayHeaders });
+    const res = await originalFetch(vercelRelayUrl, { ...options, headers: relayHeaders });
+    if (res.status === 429 || res.status === 402 || res.status === 403) {
+      const poolId = proxyOptions?.proxyPoolId || proxyOptions?.connectionProxyPoolId;
+      if (poolId) {
+        import("@/lib/localDb").then(({ updateProxyPool }) => {
+          updateProxyPool(poolId, {
+            isActive: false,
+            testStatus: "failed",
+            lastError: `quota_exhausted: upstream returned HTTP ${res.status}`,
+          }).catch(() => {});
+        }).catch(() => {});
+      }
+    }
+    return res;
   }
 
   const connectionProxyUrl = resolveConnectionProxyUrl(targetUrl, proxyOptions);

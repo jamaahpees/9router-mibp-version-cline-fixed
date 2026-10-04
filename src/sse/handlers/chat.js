@@ -74,10 +74,20 @@ export async function handleChat(request, clientRawRequest = null) {
       log.warn("AUTH", "Missing API key (requireApiKey=true)");
       return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Missing API key");
     }
-    const valid = await isValidApiKey(apiKey);
-    if (!valid) {
+    const authResult = await isValidApiKey(apiKey);
+    if (authResult === false) {
       log.warn("AUTH", "Invalid API key (requireApiKey=true)");
       return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key");
+    }
+    if (typeof authResult === "object" && authResult?.valid === false) {
+      log.warn("AUTH", `API key usage limit exceeded: ${authResult.usage}/${authResult.limit}`);
+      return new Response(JSON.stringify({
+        error: {
+          message: `Usage limit exceeded for this API key (${authResult.usage}/${authResult.limit} tokens).`,
+          type: "insufficient_quota",
+          code: "insufficient_quota"
+        }
+      }), { status: 429, headers: { "Content-Type": "application/json" } });
     }
   }
 

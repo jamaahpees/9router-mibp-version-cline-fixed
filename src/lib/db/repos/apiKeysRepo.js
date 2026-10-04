@@ -10,6 +10,8 @@ function rowToKey(row) {
     machineId: row.machineId,
     isActive: row.isActive === 1 || row.isActive === true,
     createdAt: row.createdAt,
+    usageLimit: row.usageLimit ?? null,
+    usagePeriod: row.usagePeriod ?? "all",
   };
 }
 
@@ -25,7 +27,7 @@ export async function getApiKeyById(id) {
   return rowToKey(row);
 }
 
-export async function createApiKey(name, machineId) {
+export async function createApiKey(name, machineId, usageLimit = null, usagePeriod = "all") {
   if (!machineId) throw new Error("machineId is required");
   const db = await getAdapter();
   const { generateApiKeyWithMachine } = await import("@/shared/utils/apiKey");
@@ -37,10 +39,12 @@ export async function createApiKey(name, machineId) {
     machineId,
     isActive: true,
     createdAt: new Date().toISOString(),
+    usageLimit: usageLimit !== null && usageLimit !== undefined && usageLimit !== "" ? parseInt(usageLimit, 10) : null,
+    usagePeriod: usagePeriod || "all",
   };
   db.run(
-    `INSERT INTO apiKeys(id, key, name, machineId, isActive, createdAt) VALUES(?, ?, ?, ?, ?, ?)`,
-    [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.createdAt]
+    `INSERT INTO apiKeys(id, key, name, machineId, isActive, createdAt, usageLimit, usagePeriod) VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
+    [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.createdAt, apiKey.usageLimit, apiKey.usagePeriod]
   );
   return apiKey;
 }
@@ -52,9 +56,14 @@ export async function updateApiKey(id, data) {
     const row = db.get(`SELECT * FROM apiKeys WHERE id = ?`, [id]);
     if (!row) return;
     const merged = { ...rowToKey(row), ...data };
+    if (merged.usageLimit !== null && merged.usageLimit !== undefined && merged.usageLimit !== "") {
+      merged.usageLimit = parseInt(merged.usageLimit, 10);
+    } else {
+      merged.usageLimit = null;
+    }
     db.run(
-      `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ? WHERE id = ?`,
-      [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, id]
+      `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ?, usageLimit = ?, usagePeriod = ? WHERE id = ?`,
+      [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, merged.usageLimit, merged.usagePeriod || "all", id]
     );
     result = merged;
   });
@@ -69,7 +78,26 @@ export async function deleteApiKey(id) {
 
 export async function validateApiKey(key) {
   const db = await getAdapter();
-  const row = db.get(`SELECT isActive FROM apiKeys WHERE key = ?`, [key]);
+  const row = db.get(`SELECT * FROM apiKeys WHERE key = ?`, [key]);
   if (!row) return false;
-  return row.isActive === 1 || row.isActive === true;
+  if (row.isActive !== 1 && row.isActive !== true) return false;
+
+  // Check usage limit if configured
+  if (row.usageLimit !== null && row.usageLimit !== undefined) {
+    const limit = parseInt(row.usageLimit, 10);
+    if (limit > 0) {
+      let query = `SELECT SUM(promptTokens + completionTokens) as total FROM usageHistory WHERE apiKey = ?`;
+      const params = [key];
+      if (row.usagePeriod === "daily") {
+        query += ` AND date(timestamp) = date('now')`;
+      }
+      const usageRow = db.get(query, params);
+      const totalTokens = usageRow?.total || 0;
+      if (totalTokens >= limit) {
+        return { valid: false, reason: "limit_exceeded", usage: totalTokens, limit };
+      }
+    }
+  }
+
+  return true;
 }
