@@ -18,7 +18,20 @@ function rowToKey(row) {
 export async function getApiKeys() {
   const db = await getAdapter();
   const rows = db.all(`SELECT * FROM apiKeys ORDER BY createdAt ASC`);
-  return rows.map(rowToKey);
+  const keys = rows.map(rowToKey);
+
+  // Attach token usage to each key
+  for (const k of keys) {
+    let query = `SELECT SUM(promptTokens + completionTokens) as total FROM usageHistory WHERE apiKey = ?`;
+    const params = [k.key];
+    if (k.usagePeriod === "daily") {
+      query += ` AND date(timestamp) = date('now')`;
+    }
+    const usageRow = db.get(query, params);
+    k.currentUsage = usageRow?.total || 0;
+  }
+
+  return keys;
 }
 
 export async function getApiKeyById(id) {

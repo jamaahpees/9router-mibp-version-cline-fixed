@@ -1095,6 +1095,47 @@ export default function APIPageClient({ machineId }) {
                       Edit Limit
                     </button>
                   </div>
+
+                  {key.usageLimit ? (
+                    <div className="mt-2.5 max-w-md">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-text-muted">
+                          Usage: <strong className="text-text-main">{(key.currentUsage || 0).toLocaleString()}</strong> / {key.usageLimit.toLocaleString()} tokens
+                        </span>
+                        <span className={`font-medium ${
+                          (key.currentUsage || 0) >= key.usageLimit
+                            ? "text-red-500"
+                            : (key.currentUsage || 0) / key.usageLimit > 0.8
+                            ? "text-yellow-500"
+                            : "text-emerald-500"
+                        }`}>
+                          {Math.max(0, key.usageLimit - (key.currentUsage || 0)).toLocaleString()} remaining (
+                          {Math.max(0, Math.min(100, Math.round(((key.usageLimit - (key.currentUsage || 0)) / key.usageLimit) * 100)))}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-surface-3 dark:bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            (key.currentUsage || 0) >= key.usageLimit
+                              ? "bg-red-500"
+                              : (key.currentUsage || 0) / key.usageLimit > 0.8
+                              ? "bg-yellow-500"
+                              : "bg-brand-500"
+                          }`}
+                          style={{
+                            width: `${Math.min(100, Math.round(((key.currentUsage || 0) / key.usageLimit) * 100))}%`
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-1">
+                      <span className="text-[11px] text-text-muted">
+                        Total used: {(key.currentUsage || 0).toLocaleString()} tokens
+                      </span>
+                    </div>
+                  )}
+
                   {key.isActive === false && (
                     <p className="text-xs text-orange-500 mt-1">Paused</p>
                   )}
