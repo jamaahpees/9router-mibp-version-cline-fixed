@@ -225,7 +225,7 @@ export default function ModelSelectModal({
             value: fullModel,
           }));
         const customRegisteredModels = customModels
-          .filter((m) => m.providerAlias === alias)
+          .filter((m) => m && m.providerAlias === alias)
           .map((m) => ({
             id: m.id,
             name: m.name || m.id,
@@ -295,7 +295,7 @@ export default function ModelSelectModal({
         // Merge custom models registered via /api/models/custom for this provider
         // providerAlias in DB uses the raw providerId, not the display prefix
         const registeredCustom = customModels
-          .filter((m) => m.providerAlias === providerId)
+          .filter((m) => m && m.providerAlias === providerId)
           .map((m) => ({
             id: m.id,
             name: m.name || m.id,
